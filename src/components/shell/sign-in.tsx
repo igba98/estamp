@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { CircleAlert, MailCheck, RotateCw } from "lucide-react"
 import { Logo } from "@/components/brand/logo"
 import { Panel } from "@/components/page-header"
@@ -19,6 +20,12 @@ function Frame({ children }: { children: React.ReactNode }) {
           <Logo />
         </div>
         {children}
+        <p className="mt-5 text-center text-[13px] text-faint">
+          Need help?{" "}
+          <Link href="/contact" className="font-semibold text-muted-foreground underline decoration-white/20 hover:text-foreground">
+            Contact us
+          </Link>
+        </p>
       </Fade>
     </div>
   )

@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useMemo, useState } from "react"
-import { Ban, Download, ExternalLink, Link2, Search, Stamp, Trash2, X, LayoutGrid, List } from "lucide-react"
+import { Ban, Download, ExternalLink, Link2, Mail, Search, Stamp, Trash2, X, LayoutGrid, List } from "lucide-react"
 import { toast } from "sonner"
 import { Page, PageHeader, Panel } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
@@ -23,7 +23,7 @@ import { DocumentsSkeleton } from "@/components/skeletons"
 import { Segmented } from "@/components/designer/segmented"
 import { DocIcon, Fade, kindLabel } from "@/components/docs/doc-bits"
 import { InkDot } from "@/components/stamp/stamp-tiles"
-import { clearDocs, deleteDoc, downloadStored, isAdmin, revokeDoc, useAppState } from "@/lib/store"
+import { clearDocs, deleteDoc, downloadStored, emailDocument, isAdmin, revokeDoc, useAppState } from "@/lib/store"
 import { download, formatBytes } from "@/lib/documents"
 import { friendlyError } from "@/lib/supabase"
 import { formatDateTime, timeAgo } from "@/lib/format"
@@ -268,6 +268,7 @@ function Details({ doc, onClose, bare }: { doc: StampedDoc; onClose: () => void;
   const [revoking, setRevoking] = useState(false)
   const [reason, setReason] = useState("")
   const [busy, setBusy] = useState(false)
+  const [mailing, setMailing] = useState(false)
   const admin = useAppState(isAdmin)
   const body = (
     <>
@@ -322,6 +323,19 @@ function Details({ doc, onClose, bare }: { doc: StampedDoc; onClose: () => void;
             }}
           >
             <Download /> {busy ? "Downloading…" : "Download stamped file"}
+          </Button>
+        )}
+        {doc.outputPath && (
+          <Button
+            variant="outline"
+            disabled={mailing}
+            onClick={async () => {
+              setMailing(true)
+              await emailDocument(doc.id)
+              setMailing(false)
+            }}
+          >
+            <Mail /> {mailing ? "Emailing…" : "Email it to me"}
           </Button>
         )}
         <Button

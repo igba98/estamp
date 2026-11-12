@@ -7,13 +7,18 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test \"src/**/*.test.ts\" && supabase/tests/run-tests.sh",
-    "test:unit": "node --test \"src/**/*.test.ts\"",
-    "test:remote": "node --env-file=.env.local supabase/tests/remote-e2e.mjs"
+    "test": "npm run test:unit && supabase/tests/run-tests.sh",
+    "test:unit": "node --import tsx --test \"src/**/*.test.ts\" \"src/**/*.test.tsx\"",
+    "test:remote": "node --env-file=.env.local supabase/tests/remote-e2e.mjs",
+    "email": "email dev --dir src/emails --port 3030",
+    "email:assets": "node --import tsx scripts/email-assets.tsx",
+    "email:send-tests": "node --import tsx --env-file=.env.local scripts/send-test-emails.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
     "@fontsource-variable/urbanist": "^5.3.0",
+    "@react-email/components": "^1.0.12",
+    "@react-email/render": "^2.3.1",
     "@supabase/supabase-js": "2.118.0",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.5.2",
@@ -25,15 +30,18 @@
     "next": "16.4.6",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.5.438",
-    "postmark": "5.1.0",
     "qrcode": "^1.5.4",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "resend": "^6.38.0",
     "shadcn": "^4.23.0",
     "sonner": "^2.0.8",
-    "tw-animate-css": "^1.4.0"
+    "standardwebhooks": "^1.1.1",
+    "tw-animate-css": "^1.4.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@react-email/ui": "^6.11.11",
     "@tailwindcss/turbopack": "4.3.3",
     "@types/node": "^20",
     "@types/qrcode": "^1.5.6",
@@ -41,7 +49,9 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
+    "react-email": "^6.11.11",
     "tailwindcss": "4.3.3",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

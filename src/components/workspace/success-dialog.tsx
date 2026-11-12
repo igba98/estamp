@@ -1,12 +1,14 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { motion, useReducedMotion } from "motion/react"
-import { Download, Link2, Stamp } from "lucide-react"
+import { Check, Download, Link2, Mail, Stamp } from "lucide-react"
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { download, formatBytes } from "@/lib/documents"
+import { emailDocument } from "@/lib/store"
 import type { ExportResult } from "./export"
 
 export function SuccessDialog({
@@ -19,6 +21,8 @@ export function SuccessDialog({
   onAnother: () => void
 }) {
   const reduce = useReducedMotion()
+  const [mail, setMail] = useState<{ id: string; s: "sending" | "sent" } | null>(null)
+  const mailState = mail?.id === result?.doc.id ? mail?.s : undefined
   return (
     <Dialog open={!!result} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="gap-0 overflow-hidden border-white/[0.08] p-0 sm:max-w-[440px]">
@@ -73,6 +77,19 @@ export function SuccessDialog({
                 <Download /> Download again
               </Button>
               <div className="grid grid-cols-2 gap-2">
+                {result.synced && (
+                  <Button
+                    variant="outline"
+                    disabled={!!mailState}
+                    onClick={async () => {
+                      const id = result.doc.id
+                      setMail({ id, s: "sending" })
+                      setMail((await emailDocument(id)) ? { id, s: "sent" } : null)
+                    }}
+                  >
+                    {mailState === "sent" ? <Check /> : <Mail />} {mailState === "sending" ? "Emailing…" : mailState === "sent" ? "Emailed" : "Email to me"}
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   onClick={async () => {
@@ -88,6 +105,7 @@ export function SuccessDialog({
                 </Button>
                 <Button
                   variant="outline"
+                  className={result.synced ? "col-span-2" : undefined}
                   onClick={() => {
                     onClose()
                     onAnother()

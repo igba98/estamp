@@ -77,3 +77,20 @@ export function paging(u: URL) {
   const before = raw && !Number.isNaN(Date.parse(raw)) ? new Date(raw).toISOString() : null
   return { limit, before }
 }
+
+export type Member = { userId: string; email: string; orgId: string; role: string; displayName: string }
+
+/** Resolve "Authorization: Bearer <Supabase session token>" to the caller's membership, or an error response. */
+export async function sessionMember(req: Request): Promise<Member | Response> {
+  const token = /^Bearer\s+(\S+)$/.exec(req.headers.get("authorization") ?? "")?.[1]
+  const { data: auth } = token ? await db.auth.getUser(token) : { data: { user: null } }
+  if (!auth.user) return apiError(401, "unauthorized", "Sign in first.")
+  const { data: me } = await db.from("members").select("org_id, role, display_name, email").eq("user_id", auth.user.id).maybeSingle()
+  if (!me) return apiError(403, "not_member", "Not in an organisation.")
+  return { userId: auth.user.id, email: auth.user.email ?? me.email, orgId: me.org_id, role: me.role, displayName: me.display_name }
+}
+
+/** Caller's IP as set by the host (Vercel overwrites x-forwarded-for, so it can't be spoofed there). */
+export function clientIp(req: Request) {
+  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || null
+}

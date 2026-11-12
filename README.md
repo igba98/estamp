@@ -15,7 +15,8 @@ Create electronic stamps and put them on PDF, Word (.docx) and image files. Stam
    <p><a href="{{ .ConfirmationURL }}">Or tap here to sign in</a></p>
    ```
 5. **Auth → Providers.** Keep *Email* on. Leave the other providers off: invites trust the email address on the account.
-6. **Email (Postmark).** Supabase sends sign-in codes through Postmark SMTP (`smtp.postmarkapp.com:587`, server token as user and password) on the default `outbound` stream. The app's own emails (invites, approval requested/decided) go through `POST /api/notify` on the `estamp` stream. The From address must be a confirmed Sender Signature in Postmark (or on a DKIM-verified domain); use your own domain in production so mail isn't marked as spam.
+6. **Email (Resend).** The domain `workwithignas.com` is verified in Resend and every email goes out from `estamp@workwithignas.com` (the estamp inbox). Fill the Resend values in `.env.local` (see `.env.example`; they're validated at boot by `src/lib/server/env.ts`). For sign-in emails, point Supabase *Auth → SMTP* at Resend: host `smtp.resend.com`, port `465`, user `resend`, password = the Resend API key, sender `estamp@workwithignas.com`, name `eStamp`.
+7. **Receiving.** In Resend → Webhooks, add `https://<your domain>/api/webhooks/resend` with the event `inbox.email.received`, and put its signing secret in `RESEND_WEBHOOK_SECRET`.
 
 ## Run it
 
@@ -25,9 +26,12 @@ npm run dev          # http://localhost:3000
 npm test             # unit tests + database access-rule tests (needs Docker)
 npm run test:remote  # end-to-end against the project in .env.local (+ the API if the dev server runs on :3001)
 npm run build && npm start
+npm run email             # preview every email template at http://localhost:3030
+npm run email:assets      # rebuild public/email/*.png (logo + icons) after changing colours
+npm run email:send-tests  # send every template (realistic + worst case) to EMAIL_ADMIN_NOTIFY
 ```
 
-Needs a Node server for `/api/*`, so deploy to Vercel (or any Node host), not a static host. Add the three Supabase variables there. Deploy before printing real stamps: the QR points at `<your domain>/v?id=…`.
+Needs a Node server for `/api/*`, so deploy to Vercel (or any Node host), not a static host. Add the Supabase and email variables from `.env.example` there. Deploy before printing real stamps: the QR points at `<your domain>/v?id=…`.
 
 ## Features
 
@@ -38,10 +42,11 @@ Needs a Node server for `/api/*`, so deploy to Vercel (or any Node host), not a 
 | Stamp a document | `/stamp` | PDF, images (PDF or PNG), DOCX. Each stamp gets a database record first, so the QR points at it |
 | Stamp library | `/stamps` | Admins design stamps. Switches: *Log in mail register*, *Needs approval* |
 | Bulk stamping | `/bulk` | Up to 50 PDFs or images with one stamp in one corner (first, last or every page). Each gets its own record; download all as a ZIP. Word files stay on the single-document screen |
-| Stamped documents | `/documents` | Organisation-wide history. Download the stamped file, copy the verify link, revoke (admins), delete (admins) |
+| Stamped documents | `/documents` | Organisation-wide history. Email it to yourself, download the stamped file, copy the verify link, revoke (admins), delete (admins) |
 | Mail register | `/register` | Numbered incoming mail (`IN/2026/0001`), automatic from register stamps or added by hand. CSV export |
 | Approvals | `/approvals` | A member requests a gated stamp for one file; an admin approves or rejects; the member stamps that exact file once |
 | Verify | `/verify`, public `/v?id=` | Looks up the record, shows revoked stamps, and checks whether a received file is the exact issued copy. Old `/v?d=` links still decode |
+| Contact | public `/contact` | Contact form (Cloudflare Turnstile). The message lands in the estamp inbox; the sender gets one auto-reply |
 | Settings | `/settings` | Organisation details, reference prefix, your name, team and invites, API keys, plan and billing |
 
 ## API (v1)
@@ -58,9 +63,21 @@ Admins create keys in *Settings → API keys*. A key is shown once; only its SHA
 
 Errors look like `{"error": {"code": "unauthorized", "message": "…"}}` with status 400, 401, 404, 500 or 503.
 
-## Email notifications
+## Email (Resend)
 
-`/api/notify` sends, from the server, only what the caller just did: an admin's invite (to the invitee), a member's approval request (to the admins), an admin's decision (to the requester). The server re-reads the record and picks the recipients; notifications older than 10 minutes are refused, so the route can't be used to spam. Templates are in `src/lib/emails.ts` (all user input is HTML-escaped).
+Templates are React Email components in `src/emails/` ("eStamp Dark": black canvas, raised cards, brand ink accent). Each exports typed props, realistic `PreviewProps`, worst-case `variants` and `meta()` (subject + preheader). `src/emails/components/` holds the building blocks; images are PNGs in `public/email/` (Gmail blocks SVG). Every send has an HTML and a plain-text version.
+
+| Email | Sent by | To |
+| --- | --- | --- |
+| Stamped document (file attached) | *Email it to me* in the success dialog and document details → `POST /api/email/document` | Only the signed-in person's own address. 5/hour, 20/day per person. Files over 28 MB are refused with a "download it instead" message (Resend's limit is 40 MB after encoding) |
+| Contact received (auto-reply) | `/contact` → `POST /api/contact` | The sender, once per message |
+| New inbound notification | `/api/contact`, and `POST /api/webhooks/resend` for anything else emailed to estamp@ | `EMAIL_ADMIN_NOTIFY`. Reply in your mail app to answer the sender |
+| Invites, approval requested/decided | `POST /api/notify` (templates in `src/lib/emails.ts`) | The people concerned; the server picks recipients |
+| Receipt, product update | Not sent yet (receipt waits for billing; product update is for Resend Broadcasts) | |
+
+Abuse protection on the contact form: Turnstile checked on the server, 5 messages/hour and 20/day per IP, one fixed recipient, HTML stripped, 5,000-character messages. The webhook checks the Svix signature on the raw body, rejects timestamps more than 5 minutes off, ignores repeated event ids, answers 200 at once and does the work after (`after()`). Sends carry Resend idempotency keys, so a retry never emails twice.
+
+**Test receiving locally:** run `npm run dev`, then `npx cloudflared tunnel --url http://localhost:3000` (or `ngrok http 3000`). In Resend → Webhooks, add `<tunnel URL>/api/webhooks/resend` with `inbox.email.received`, copy its signing secret into `RESEND_WEBHOOK_SECRET`, restart the dev server, and email estamp@workwithignas.com from another address. You should get a "New email" notification at `EMAIL_ADMIN_NOTIFY`.
 
 ## Billing
 
@@ -93,6 +110,8 @@ Plans live in `src/lib/plans.ts` (prices not set yet, so nothing is charged and 
 - API calls aren't rate-limited. Keys are 256-bit random, so guessing isn't practical, but add a limit before opening the API widely.
 - DOCX: stamps go on the first or last page because Word decides page breaks.
 - Data stored in the browser by the earlier device-only version is not imported.
+- Rate limits are kept in memory per server instance (`src/lib/server/rate-limit.ts`); move them to Upstash before heavy traffic.
+- The new-inbound email links to the Resend inbox, not the exact thread.
 
 ## Design skills
 

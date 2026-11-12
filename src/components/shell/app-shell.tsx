@@ -10,7 +10,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ProDialog } from "@/components/shell/pro-dialog"
-import { MAIN_NAV, PRO_NAV, SETTINGS_NAV, isActive, type NavItem } from "./nav-config"
+import { HELP_NAV, MAIN_NAV, PRO_NAV, SETTINGS_NAV, isActive, type NavItem } from "./nav-config"
 import { isAdmin, refreshIfStale, signOut, useAppState } from "@/lib/store"
 import { LoadFailed, SignIn } from "./sign-in"
 
@@ -189,6 +189,7 @@ function SidebarBody({
           </div>
         )}
         <NavLink item={SETTINGS_NAV} active={isActive(pathname, SETTINGS_NAV.href)} collapsed={collapsed} onNavigate={onNavigate} />
+        <NavLink item={HELP_NAV} active={false} collapsed={collapsed} onNavigate={onNavigate} />
         <SignOutButton email={email} collapsed={collapsed} />
         {onToggle && collapsed && (
           <button

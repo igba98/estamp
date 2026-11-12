@@ -19,6 +19,7 @@ import type {
   StampedDoc,
 } from "./types"
 import { sha256Hex, verifyUrlFor } from "./verify"
+import type { SendResult } from "./email-input"
 import { startOfWeek } from "./format"
 
 type State = {
@@ -678,6 +679,31 @@ async function notify(n: Notice): Promise<number> {
   } catch {
     return 0
   }
+}
+
+/** Email a stamped file to the signed-in person's own address (server: /api/email/document). Toasts the outcome, with Retry on failure. */
+export async function emailDocument(id: string): Promise<boolean> {
+  const t = toast.loading("Emailing the stamped file to you…")
+  let r: SendResult
+  try {
+    const { data } = await supabase.auth.getSession()
+    const res = await fetch("/api/email/document", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session?.access_token ?? ""}` },
+      body: JSON.stringify({ id }),
+    })
+    const body = (await res.json().catch(() => null)) as Partial<SendResult> & { error?: { message?: string } } | null
+    r = typeof body?.ok === "boolean" ? (body as SendResult) : { ok: false, code: "error", message: body?.error?.message ?? "Couldn't email the file. Try again." }
+  } catch (e) {
+    r = { ok: false, code: "network", message: friendlyError(e) }
+  }
+  if (r.ok) {
+    toast.success(`Sent to ${r.to ?? "your email"}`, { id: t, description: "It can take a minute to arrive." })
+    return true
+  }
+  const retry = !["too_large", "not_stored", "not_found", "mail_not_configured"].includes(r.code)
+  toast.error(r.message, { id: t, action: retry ? { label: "Retry", onClick: () => void emailDocument(id) } : undefined })
+  return false
 }
 
 /* ---------- billing ---------- */

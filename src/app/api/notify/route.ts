@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server"
-import { apiError, db, json } from "@/lib/server/api"
+import { apiError, db, json, sessionMember } from "@/lib/server/api"
 import { mailConfigured, sendMail } from "@/lib/server/mail"
 import { approvalDecidedEmail, approvalRequestedEmail, inviteEmail } from "@/lib/emails"
 
@@ -18,11 +18,10 @@ const fresh = (at: string | null) => !!at && Date.now() - Date.parse(at) < FRESH
  */
 export async function POST(req: NextRequest) {
   if (!mailConfigured) return apiError(503, "mail_not_configured", "Email isn't set up on this server.")
-  const token = /^Bearer\s+(\S+)$/.exec(req.headers.get("authorization") ?? "")?.[1]
-  const { data: auth } = token ? await db.auth.getUser(token) : { data: { user: null } }
-  if (!auth.user) return apiError(401, "unauthorized", "Sign in first.")
-  const { data: me } = await db.from("members").select("org_id, role, display_name, email").eq("user_id", auth.user.id).maybeSingle()
-  if (!me) return apiError(403, "not_member", "Not in an organisation.")
+  const m = await sessionMember(req)
+  if (m instanceof Response) return m
+  const me = { org_id: m.orgId, role: m.role, display_name: m.displayName, email: m.email }
+  const auth = { user: { id: m.userId } }
   const admin = me.role === "owner" || me.role === "admin"
   const body = (await req.json().catch(() => null)) as Body | null
   const origin = req.nextUrl.origin

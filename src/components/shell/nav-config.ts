@@ -1,4 +1,5 @@
 import {
+  LifeBuoy,
   ClipboardCheck,
   FolderClosed,
   Inbox,
@@ -28,6 +29,7 @@ export const MAIN_NAV: NavItem[] = [
 export const PRO_NAV: NavItem[] = [{ href: "#", label: "Mobile-money billing", icon: Smartphone, soon: true }]
 
 export const SETTINGS_NAV: NavItem = { href: "/settings", label: "Settings", icon: Settings }
+export const HELP_NAV: NavItem = { href: "/contact", label: "Contact support", icon: LifeBuoy }
 
 export function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/"
